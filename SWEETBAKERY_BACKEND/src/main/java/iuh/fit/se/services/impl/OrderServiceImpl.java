@@ -5,10 +5,14 @@ import iuh.fit.se.dtos.request.OrderItemRequest;
 import iuh.fit.se.dtos.response.OrderDetailResponse;
 import iuh.fit.se.dtos.response.OrderResponse;
 import iuh.fit.se.entities.*;
+import iuh.fit.se.dtos.response.QrPaymentResponse;
 import iuh.fit.se.entities.enums.PastryStatus; // Đảm bảo đã import
+import iuh.fit.se.entities.enums.PaymentMethod;
+import iuh.fit.se.entities.enums.PaymentStatus;
 import iuh.fit.se.entities.enums.TrangThaiDH;
 import iuh.fit.se.repositories.*;
 import iuh.fit.se.services.OrderService;
+import iuh.fit.se.services.WarehouseInventoryService;
 import iuh.fit.se.entities.enums.HttpCode;
 import iuh.fit.se.exceptions.AppException;
 import lombok.AccessLevel;
@@ -35,6 +39,8 @@ public class OrderServiceImpl implements OrderService {
     iuh.fit.se.services.VnPayService vnPayService;
     iuh.fit.se.repositories.VnPayTransactionRepository vnPayTransactionRepository;
     com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    WarehouseInventoryService warehouseInventoryService;
+    iuh.fit.se.services.VietQrService vietQrService;
 
     @Override
     @Transactional
@@ -50,9 +56,9 @@ public class OrderServiceImpl implements OrderService {
         order.setId(UUID.randomUUID().toString());
         order.setNgayDatHang(LocalDateTime.now());
         order.setTrangThai(TrangThaiDH.PENDING);
+        order.setPaymentStatus(PaymentStatus.PENDING);
         order.setCustomer(account.getUser());
-        if (request.getPaymentMethod() != null)
-            order.setPaymentMethod(request.getPaymentMethod());
+        order.setPaymentMethod(PaymentMethod.normalize(request.getPaymentMethod()));
 
         List<OrderDetail> details = new ArrayList<>();
         double total = 0.0;
@@ -64,16 +70,7 @@ public class OrderServiceImpl implements OrderService {
                 if (!pOpt.isPresent()) continue;
                 Pastry pastry = pOpt.get();
 
-                // TRỪ STOCK
-                if (pastry.getStockQuantity() < it.getQty()) {
-                    throw new RuntimeException("Sản phẩm " + pastry.getName() + " không đủ số lượng tồn kho (Còn: " + pastry.getStockQuantity() + ")");
-                }
-                int newStock = pastry.getStockQuantity() - it.getQty();
-                pastry.setStockQuantity(newStock);
-                if (newStock <= 0) {
-                    pastry.setStatus(PastryStatus.OUT_OF_STOCK);
-                }
-                pastryRepository.save(pastry);
+                warehouseInventoryService.consume(pastry, it.getQty());
 
                 OrderDetail od = new OrderDetail();
                 od.setId(UUID.randomUUID().toString());
@@ -119,7 +116,7 @@ public class OrderServiceImpl implements OrderService {
         resp.setBankAccountNumber(order.getBankAccountNumber());
         resp.setBankName(order.getBankName());
 
-        if (order.getPaymentMethod() != null && "VNPAY".equalsIgnoreCase(order.getPaymentMethod())) {
+        if (PaymentMethod.VNPAY.name().equalsIgnoreCase(order.getPaymentMethod())) {
             long amount = Math.round(order.getTongTien());
             try {
                 String url = vnPayService.createPaymentUrl(order.getId(), amount, null, "Thanh toan don hang " + order.getId());
@@ -128,7 +125,29 @@ public class OrderServiceImpl implements OrderService {
                 log.error("Failed to create VNPay url", ex);
             }
         }
+        if (PaymentMethod.isVietQr(order.getPaymentMethod())) {
+            QrPaymentResponse qr = vietQrService.generate(order);
+            resp.setPaymentUrl(qr.getPaymentUrl());
+        }
         return resp;
+    }
+
+    @Override
+    public QrPaymentResponse generateQrPaymentForCurrentUser(String orderId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            throw new AppException(HttpCode.UNAUTHENTICATED);
+        }
+        AccountCredential account = accountCredentialRepository.findByCredential(authentication.getName());
+        if (account == null || account.getUser() == null) {
+            throw new AppException(HttpCode.UNAUTHENTICATED);
+        }
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(HttpCode.NOT_FOUND));
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(account.getUser().getId())) {
+            throw new AppException(HttpCode.UNAUTHORIZED);
+        }
+        return vietQrService.generate(order);
     }
 
     @Override
@@ -161,16 +180,7 @@ public class OrderServiceImpl implements OrderService {
                     if (!pOpt.isPresent()) continue;
                     Pastry pastry = pOpt.get();
 
-                    // TRỪ STOCK VNPAY
-                    if (pastry.getStockQuantity() < it.getQty()) {
-                        throw new RuntimeException("Sản phẩm " + pastry.getName() + " không đủ số lượng.");
-                    }
-                    int newStock = pastry.getStockQuantity() - it.getQty();
-                    pastry.setStockQuantity(newStock);
-                    if (newStock <= 0) {
-                        pastry.setStatus(PastryStatus.OUT_OF_STOCK);
-                    }
-                    pastryRepository.save(pastry);
+                    warehouseInventoryService.consume(pastry, it.getQty());
 
                     OrderDetail od = new OrderDetail();
                     od.setId(UUID.randomUUID().toString());

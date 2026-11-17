@@ -21,6 +21,7 @@ const orderApi = {
     createBankAccount: (payload) => axiosClient.post("/bank-accounts", payload),
     list: () => axiosClient.get("/orders"),
     get: (id) => axiosClient.get(`/orders/${id}`),
+    getQrPayment: (id) => axiosClient.get(`/orders/${id}/qr-payment`),
     cancel: (id, lyDoHuy) => axiosClient.put(`/orders/${id}/cancel`, { lyDoHuy })
 }
 

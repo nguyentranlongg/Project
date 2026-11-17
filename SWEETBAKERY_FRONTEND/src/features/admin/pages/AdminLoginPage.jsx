@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import authApi from "../../auth/apis/authApi";
+import { hasAdminPanelAccess } from "../constants/staffRoles";
 
 // --- ICONS ---
 const ShieldIcon = ({ className }) => (
@@ -144,13 +145,7 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Check if user has ADMIN role
-      const roles = userData.roles || [];
-      const isAdminOrEmployee = roles.some(
-        (role) => role.name === "ADMIN" || role.name === "EMPLOYEE"
-      );
-
-      if (!isAdminOrEmployee) {
+      if (!hasAdminPanelAccess(userData.roles)) {
         setError("Tài khoản không có quyền truy cập.");
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");

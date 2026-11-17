@@ -36,6 +36,13 @@ public class Pastry {
     @Column(name = "stock_quantity")
     private int stockQuantity = 0;
 
+    @Column(name = "min_threshold", nullable = false)
+    private int minThreshold = 5;
+
+    /** Số ngày bánh tươi giữ được sau khi ra lò. Dùng để tính hạn của từng mẻ. */
+    @Column(name = "shelf_life_days")
+    private Integer shelfLifeDays = 2;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private PastryStatus status = PastryStatus.DRAFT;

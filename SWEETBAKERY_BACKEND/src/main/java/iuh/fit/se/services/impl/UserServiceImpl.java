@@ -1,5 +1,6 @@
 package iuh.fit.se.services.impl;
 
+import iuh.fit.se.dtos.request.AssignUserRoleRequest;
 import iuh.fit.se.dtos.response.UserResponse;
 import iuh.fit.se.entities.AccountCredential;
 import iuh.fit.se.entities.Role;
@@ -22,6 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -98,6 +100,49 @@ public class UserServiceImpl implements UserService {
         UserResponse userResponse = userMapper.toUserResponse(user);
         userResponse.setUsername(username);
         return userResponse;
+    }
+
+    private static final Set<String> ASSIGNABLE_ROLES = Set.of(
+            UserRole.SALES.name(),
+            UserRole.IMPORT_STAFF.name(),
+            UserRole.INVENTORY_MANAGER.name(),
+            UserRole.ACCOUNTANT.name(),
+            UserRole.EMPLOYEE.name(),
+            UserRole.ADMIN.name(),
+            UserRole.CUSTOMER.name()
+    );
+
+    @Override
+    public UserResponse assignRole(String userId, AssignUserRoleRequest request) {
+        String roleName = request == null || request.getRole() == null
+                ? ""
+                : request.getRole().trim().toUpperCase().replace(' ', '_').replace('-', '_');
+        if (roleName.startsWith("ROLE_")) {
+            roleName = roleName.substring(5);
+        }
+        if (roleName.isEmpty() || !ASSIGNABLE_ROLES.contains(roleName)) {
+            throw new AppException(HttpCode.BAD_REQUEST);
+        }
+        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(HttpCode.USER_NOT_FOUND));
+        Role role = roleRepository.findById(roleName).orElseThrow(() -> new AppException(HttpCode.ROLE_NOT_FOUND));
+        if (user.getRoles() == null) {
+            user.setRoles(new HashSet<>());
+        }
+        user.getRoles().clear();
+        user.getRoles().add(role);
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+        if (request.getEmail() != null) {
+            user.setEmail(request.getEmail());
+        }
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+        return userMapper.toUserResponse(userRepository.save(user));
     }
 
     @Override

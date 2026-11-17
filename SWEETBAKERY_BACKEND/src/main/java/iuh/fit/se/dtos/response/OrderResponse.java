@@ -16,6 +16,7 @@ public class OrderResponse {
     LocalDateTime ngayDatHang;
     Double tongTien;
     String paymentMethod;
+    String paymentStatus;
     String trangThai;
     String paymentUrl;
     String customerAddress;

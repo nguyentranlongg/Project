@@ -50,6 +50,19 @@ public class SecurityConfig {
             "/gmail-management/api/v1/gmail/otp-forget-password"
     };
 
+    private final String[] DASHBOARD_GET_ENDPOINT = {
+            "/admin/api/v1/dashboard/**",
+            "/admin/api/v1/statistics/**",
+            "/admin/api/v1/orders",
+            "/admin/api/v1/orders/**",
+            "/admin/api/v1/pastries",
+            "/admin/api/v1/pastries/**",
+            "/admin/api/v1/customers",
+            "/admin/api/v1/customers/**",
+            "/customer-management/api/v1/customers",
+            "/customer-management/api/v1/customers/**"
+    };
+
     private final String[] GET_PUBLIC_ENDPOINT = {
             "/user-management/api/v1/users/information",
             "/pastry-management/api/v1/pastries/**",
@@ -59,6 +72,22 @@ public class SecurityConfig {
             "/payments/vnpay/ipn",
     };
 
+    private final String[] SALES_GET_ENDPOINT = {
+            "/pastry-management/api/v1/pastries/**",
+            "/category-management/api/v1/categories/**",
+            "/admin/api/v1/pastries",
+            "/admin/api/v1/pastries/**",
+            "/admin/api/v1/orders",
+            "/admin/api/v1/orders/**",
+            "/admin/api/v1/qr-payments/generate/**",
+    };
+    private final String[] SALES_POST_ENDPOINT = {
+            "/admin/api/v1/orders/create-counter-order",
+    };
+    private final String[] SALES_PUT_ENDPOINT = {
+            "/admin/api/v1/orders/**",
+            "/admin/api/v1/qr-payments/confirm/**",
+    };
     private final String[] EMPLOYEE_ENDPOINT = {
             "/auth-management/api/v1/auth/**",
             "/gmail-management/api/v1/gmail/**",
@@ -96,6 +125,94 @@ public class SecurityConfig {
         httpSecurity.authorizeHttpRequests(request -> {
             request.requestMatchers(HttpMethod.POST, POST_PUBLIC_ENDPOINT).permitAll()
                     .requestMatchers(HttpMethod.GET, GET_PUBLIC_ENDPOINT).permitAll()
+                    .requestMatchers(HttpMethod.GET, DASHBOARD_GET_ENDPOINT)
+                    .hasAnyRole(
+                            UserRole.SALES.name(),
+                            UserRole.IMPORT_STAFF.name(),
+                            UserRole.INVENTORY_MANAGER.name(),
+                            UserRole.ACCOUNTANT.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers(HttpMethod.GET, "/orders/*/qr-payment")
+                    .hasAnyRole(
+                            UserRole.CUSTOMER.name(),
+                            UserRole.GUEST.name(),
+                            UserRole.ADMIN.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.SALES.name(),
+                            UserRole.IMPORT_STAFF.name(),
+                            UserRole.INVENTORY_MANAGER.name(),
+                            UserRole.ACCOUNTANT.name()
+                    )
+                    .requestMatchers(HttpMethod.GET, "/admin/api/v1/qr-payments/generate/**")
+                    .hasAnyRole(
+                            UserRole.CUSTOMER.name(),
+                            UserRole.SALES.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers("/admin/api/v1/orders", "/admin/api/v1/orders/**")
+                    .hasAnyRole(
+                            UserRole.SALES.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers("/admin/api/v1/inventory-receipts", "/admin/api/v1/inventory-receipts/**")
+                    .hasAnyRole(UserRole.IMPORT_STAFF.name(), UserRole.ADMIN.name())
+                    .requestMatchers(HttpMethod.GET, "/admin/api/v1/stock-adjustments/low-stock")
+                    .hasAnyRole(
+                            UserRole.IMPORT_STAFF.name(),
+                            UserRole.INVENTORY_MANAGER.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers("/admin/api/v1/stock-adjustments", "/admin/api/v1/stock-adjustments/**")
+                    .hasAnyRole(UserRole.INVENTORY_MANAGER.name(), UserRole.ADMIN.name())
+                    .requestMatchers("/admin/api/v1/accounting", "/admin/api/v1/accounting/**")
+                    .hasAnyRole(UserRole.ACCOUNTANT.name(), UserRole.ADMIN.name())
+                    .requestMatchers("/admin/api/v1/employee-performance", "/admin/api/v1/employee-performance/**")
+                    .hasRole(UserRole.ADMIN.name())
+                    .requestMatchers("/admin/api/v1/warehouse-notifications", "/admin/api/v1/warehouse-notifications/**")
+                    .hasAnyRole(
+                            UserRole.INVENTORY_MANAGER.name(),
+                            UserRole.IMPORT_STAFF.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers(
+                            "/gmail-management/api/v1/gmail/send-otp",
+                            "/gmail-management/api/v1/gmail/verify-otp"
+                    )
+                    .hasAnyRole(
+                            UserRole.ADMIN.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.SALES.name(),
+                            UserRole.IMPORT_STAFF.name(),
+                            UserRole.INVENTORY_MANAGER.name(),
+                            UserRole.ACCOUNTANT.name()
+                    )
+                    .requestMatchers(HttpMethod.GET, "/admin/api/v1/pastries", "/admin/api/v1/pastries/**")
+                    .hasAnyRole(
+                            UserRole.INVENTORY_MANAGER.name(),
+                            UserRole.IMPORT_STAFF.name(),
+                            UserRole.SALES.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers(HttpMethod.GET, SALES_GET_ENDPOINT).hasAnyRole(
+                            UserRole.SALES.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers(HttpMethod.POST, SALES_POST_ENDPOINT).hasAnyRole(
+                            UserRole.SALES.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.ADMIN.name()
+                    )
+                    .requestMatchers(HttpMethod.PUT, SALES_PUT_ENDPOINT).hasAnyRole(
+                            UserRole.SALES.name(),
+                            UserRole.EMPLOYEE.name(),
+                            UserRole.ADMIN.name()
+                    )
                     .requestMatchers(HttpMethod.POST, POST_CUSTOMER_ENDPOINT).hasAnyRole(
                             UserRole.CUSTOMER.name(),
                             UserRole.ADMIN.name()

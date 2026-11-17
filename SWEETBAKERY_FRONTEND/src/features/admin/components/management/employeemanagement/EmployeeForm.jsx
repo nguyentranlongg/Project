@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from "react";
 import adminApi from "../../../apis/adminApi";
 
+const STAFF_ROLES = [
+  { name: "SALES", label: "Nhân viên bán hàng" },
+  { name: "IMPORT_STAFF", label: "Nhân viên nhập kho / Bếp" },
+  { name: "INVENTORY_MANAGER", label: "Nhân viên quản lý kho" },
+  { name: "ACCOUNTANT", label: "Nhân viên kế toán" },
+  { name: "EMPLOYEE", label: "Nhân viên chung" },
+  { name: "ADMIN", label: "Quản trị viên" },
+];
+
 export default function EmployeeForm({ editingUser, onSuccess, onCancel }) {
   const [loading, setLoading] = useState(false);
 
@@ -263,23 +272,19 @@ export default function EmployeeForm({ editingUser, onSuccess, onCancel }) {
         {/* ROLES */}
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-medium text-slate-700">Vai trò</label>
-          <div className="flex gap-4 mt-2">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.roles.includes("EMPLOYEE")}
-                onChange={() => handleRoleChange("EMPLOYEE")}
-              />
-              <span>Nhân viên (EMPLOYEE)</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.roles.includes("ADMIN")}
-                onChange={() => handleRoleChange("ADMIN")}
-              />
-              <span>Quản trị viên (ADMIN)</span>
-            </label>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {STAFF_ROLES.map((role) => (
+              <label key={role.name} className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={formData.roles.includes(role.name)}
+                  onChange={() => handleRoleChange(role.name)}
+                />
+                <span>
+                  {role.label} ({role.name})
+                </span>
+              </label>
+            ))}
           </div>
         </div>
 

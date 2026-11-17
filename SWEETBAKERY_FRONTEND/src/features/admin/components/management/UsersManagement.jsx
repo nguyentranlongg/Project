@@ -6,6 +6,15 @@ const inputStyle =
   "mt-1 w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-amber-500 focus:outline-none";
 const labelStyle = "block text-sm font-medium text-slate-700 mb-1";
 
+const STAFF_ROLES = [
+  "SALES",
+  "IMPORT_STAFF",
+  "INVENTORY_MANAGER",
+  "ACCOUNTANT",
+  "EMPLOYEE",
+  "ADMIN",
+];
+
 export default function UsersManagement() {
   const [showForm, setShowForm] = useState(false);
   const [users, setUsers] = useState([]);
@@ -158,15 +167,17 @@ export default function UsersManagement() {
           confirmPassword: formData.confirmPassword,
         };
 
-        // Phân loại API dựa trên Role
-        if (formData.role === "EMPLOYEE") {
+        if (!formData.role) {
+          alert("Vui lòng chọn vai trò.");
+          return;
+        }
+
+        if (STAFF_ROLES.includes(formData.role)) {
           await adminApi.createEmployee(createPayload);
-        } else if (formData.role === "CUSTOMER") {
+        } else if (formData.role === "CUSTOMER" || formData.role === "GUEST") {
           await adminApi.createCustomer(createPayload);
         } else {
-          // Trường hợp Admin hoặc chưa chọn role (nếu có logic riêng)
-          alert("Chưa hỗ trợ tạo role này qua API hiện tại");
-          return;
+          await adminApi.createEmployee(createPayload);
         }
 
         alert("Tạo tài khoản thành công!");
@@ -193,8 +204,19 @@ export default function UsersManagement() {
 
         // Gọi API Update dựa trên Role CŨ (editingUser.role) hoặc Role hiện tại (vì đã disable select box nên giống nhau)
         // Lưu ý: Dùng ID của editingUser
-        if (formData.role === "EMPLOYEE") {
-          await adminApi.updateEmployee(editingUser.id, updatePayload);
+        if (STAFF_ROLES.includes(formData.role)) {
+          try {
+            await adminApi.updateEmployee(editingUser.id, updatePayload);
+          } catch (staffUpdateError) {
+            console.warn("updateEmployee failed, falling back to assignUserRole", staffUpdateError);
+            await adminApi.assignUserRole(editingUser.id, {
+              role: formData.role,
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              email: formData.email,
+              phoneNumber: formData.phoneNumber,
+            });
+          }
         } else if (formData.role === "CUSTOMER") {
           await adminApi.updateCustomer(editingUser.id, updatePayload);
         } else {
@@ -301,17 +323,15 @@ export default function UsersManagement() {
             </div>
             <div>
               <label className={labelStyle}>Vai trò</label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleInputChange}
-                disabled={!!editingUser}
-                className={inputStyle}
-              >
+              <select name="role" value={formData.role} onChange={handleInputChange} className={inputStyle}>
                 <option value="">Chọn vai trò</option>
                 <option value="CUSTOMER">Khách hàng</option>
                 <option value="EMPLOYEE">Nhân viên</option>
-                <option value="ADMIN">Quản trị viên</option>
+                <option value="SALES">Bán hàng (SALES)</option>
+                <option value="IMPORT_STAFF">Nhập kho (IMPORT_STAFF)</option>
+                <option value="INVENTORY_MANAGER">Quản lý tồn kho (INVENTORY_MANAGER)</option>
+                <option value="ACCOUNTANT">Kế toán (ACCOUNTANT)</option>
+                <option value="ADMIN">Quản trị viên (ADMIN)</option>
               </select>
             </div>
 

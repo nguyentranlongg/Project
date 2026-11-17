@@ -1,5 +1,6 @@
 package iuh.fit.se.entities;
 
+import iuh.fit.se.entities.enums.PaymentStatus;
 import iuh.fit.se.entities.enums.TrangThaiDH;
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,8 +29,16 @@ public class Order {
     @JoinColumn(name = "user_id")
     private User customer;
 
-    // payment method (e.g., CASH, MOMO)
+    // payment method: CASH, VNPAY, VIETQR (BANK_TRANSFER is stored as VIETQR)
     private String paymentMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status")
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+
+    @ManyToOne
+    @JoinColumn(name = "processed_by_employee_id")
+    private User processedByEmployee;
 
     // banking info (for VNPay refund reference)
     @Column(name = "bank_account_name", length = 150)
@@ -48,10 +57,6 @@ public class Order {
     // Lý do hủy đơn hàng
     @Column(name = "ly_do_huy", length = 500)
     private String lyDoHuy;
-
-    // @ManyToOne
-    // @JoinColumn(name = "nhan_vien_id")
-    // private Employee employee;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderDetail> orderDetails;

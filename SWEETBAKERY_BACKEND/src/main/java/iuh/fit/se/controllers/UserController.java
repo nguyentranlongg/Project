@@ -3,6 +3,7 @@ package iuh.fit.se.controllers;
 import iuh.fit.se.dtos.response.ApiResponse;
 import iuh.fit.se.dtos.response.UserResponse;
 import iuh.fit.se.entities.enums.HttpCode;
+import iuh.fit.se.dtos.request.AssignUserRoleRequest;
 import iuh.fit.se.dtos.request.UpdateUserRequest;
 import iuh.fit.se.services.UserService;
 import lombok.AccessLevel;
@@ -52,6 +53,15 @@ public class UserController {
         return ApiResponse.builder()
                 .code(HttpCode.OK.getCODE())
                 .message(HttpCode.OK.getMESSAGE())
+                .build();
+    }
+
+    @PutMapping("/{userId}/role")
+    ApiResponse<UserResponse> assignRole(@PathVariable String userId, @RequestBody AssignUserRoleRequest request) {
+        return ApiResponse.<UserResponse>builder()
+                .code(HttpCode.OK.getCODE())
+                .message(HttpCode.OK.getMESSAGE())
+                .data(userService.assignRole(userId, request))
                 .build();
     }
 

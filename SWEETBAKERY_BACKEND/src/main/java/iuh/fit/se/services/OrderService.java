@@ -3,6 +3,7 @@ package iuh.fit.se.services;
 import iuh.fit.se.dtos.request.CancelOrderRequest;
 import iuh.fit.se.dtos.request.OrderRequest;
 import iuh.fit.se.dtos.response.OrderResponse;
+import iuh.fit.se.dtos.response.QrPaymentResponse;
 
 import java.util.List;
 
@@ -18,4 +19,6 @@ public interface OrderService {
     OrderResponse getOrderById(String id);
 
     OrderResponse cancelOrder(String orderId, CancelOrderRequest request);
+
+    QrPaymentResponse generateQrPaymentForCurrentUser(String orderId);
 }

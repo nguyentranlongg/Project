@@ -4,6 +4,8 @@ import iuh.fit.se.entities.enums.PastryStatus;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.time.LocalDateTime;
+
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
@@ -17,6 +19,9 @@ public class PastryCreationResponse {
     String imageUrl;
 
     Integer stockQuantity;      // tồn kho hiện tại
+    Integer minThreshold;
+    Integer shelfLifeDays;
+    LocalDateTime nearestExpiryDate;
     PastryStatus status;        // DRAFT / ACTIVE / OUT_OF_STOCK / DISCONTINUED
 
     String categoryId;

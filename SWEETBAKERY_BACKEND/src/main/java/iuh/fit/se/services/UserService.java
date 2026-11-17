@@ -1,5 +1,6 @@
 package iuh.fit.se.services;
 
+import iuh.fit.se.dtos.request.AssignUserRoleRequest;
 import iuh.fit.se.dtos.response.UserResponse;
 
 import java.util.List;
@@ -14,4 +15,6 @@ public interface UserService {
     UserResponse getUserInformation();
     UserResponse updateInfor(iuh.fit.se.dtos.request.UpdateUserRequest request);
     boolean delete(String id);
+
+    UserResponse assignRole(String userId, AssignUserRoleRequest request);
 }

@@ -26,6 +26,10 @@ const MENU_ITEMS = [
       { id: "employees", label: "Quản lý nhân viên", icon: UsersIcon, adminOnly: true },
       { id: "customers", label: "Quản lý khách hàng", icon: UsersIcon, adminOnly: true },
       { id: "orders", label: "Quản lý đơn hàng", icon: OrderIcon, adminOnly: false },
+      { id: "inventory", label: "Nhập bánh ra lò (Sản xuất nội bộ)", icon: CategoryIcon, adminOnly: true, importStaff: true },
+      { id: "stock", label: "Quản lý tồn kho", icon: ChartIcon, adminOnly: true, inventoryManager: true },
+      { id: "accounting", label: "Kế toán & Doanh thu", icon: ChartIcon, adminOnly: true, accountant: true },
+      { id: "performance", label: "Đánh giá hiệu suất", icon: ChartIcon, adminOnly: true },
     ],
   },
 ];
@@ -39,14 +43,36 @@ export default function Sidebar({
   setSidebarOpen,
   onLogout,
   isAdmin = false, // Default false cho EMPLOYEE
+  isSales = false,
+  isImportStaff = false,
+  isInventoryManager = false,
+  isAccountant = false,
 }) {
+  const managementItem = MENU_ITEMS.find((item) => item.id === "management");
+
   // Lọc menu items dựa trên role
   const getVisibleItems = () => {
     if (isAdmin) {
       return MENU_ITEMS; // ADMIN thấy tất cả
     }
 
-    // EMPLOYEE: chỉ thấy Dashboard + Orders
+    const warehouseIds = [];
+    if (isImportStaff) warehouseIds.push("inventory");
+    if (isInventoryManager) warehouseIds.push("stock");
+    if (isAccountant) warehouseIds.push("accounting");
+    if (warehouseIds.length > 0) {
+      const ids = new Set(warehouseIds);
+      if (isSales) ids.add("orders");
+      return [
+        MENU_ITEMS[0],
+        {
+          ...managementItem,
+          children: managementItem.children.filter((child) => ids.has(child.id)),
+        },
+      ];
+    }
+
+    // EMPLOYEE / SALES: Dashboard + Orders
     return MENU_ITEMS.filter((item) => {
       if (!item.adminOnly) return true;
       // Nếu là management menu, filter children
@@ -84,7 +110,19 @@ export default function Sidebar({
           </div>
           <div>
             <h1 className="font-bold text-white">Sweet Bakery</h1>
-            <p className="text-xs text-slate-400">{isAdmin ? "Admin Panel" : "Employee Panel"}</p>
+            <p className="text-xs text-slate-400">
+              {isAdmin
+                ? "Admin Panel"
+                : isAccountant
+                  ? "Accounting Panel"
+                  : isInventoryManager
+                    ? "Inventory Management Panel"
+                    : isImportStaff
+                      ? "Import Stock Panel"
+                      : isSales
+                        ? "Sales Panel"
+                        : "Employee Panel"}
+            </p>
           </div>
         </div>
         <button
