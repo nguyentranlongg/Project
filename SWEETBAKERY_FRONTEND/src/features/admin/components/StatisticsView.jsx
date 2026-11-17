@@ -86,15 +86,24 @@ export default function StatisticsView() {
     async function load() {
       try {
         setLoading(true);
-        const [ordersRes, pastriesRes, customersRes] = await Promise.all([
+        const [ordersResult, pastriesResult, customersResult] = await Promise.allSettled([
           adminApi.getAllOrders(),
           adminApi.getAdminPastries(),
           adminApi.getAllCustomers(),
         ]);
 
-        const ordersData = ordersRes.data?.data || ordersRes.data || [];
-        const pastriesData = pastriesRes.data?.data || pastriesRes.data || [];
-        const customersData = customersRes.data?.data || customersRes.data || [];
+        const unwrapList = (result) => {
+          if (result.status !== "fulfilled") {
+            console.warn("Statistics metric failed", result.reason);
+            return [];
+          }
+          const payload = result.value?.data?.data ?? result.value?.data;
+          return Array.isArray(payload) ? payload : [];
+        };
+
+        const ordersData = unwrapList(ordersResult);
+        const pastriesData = unwrapList(pastriesResult);
+        const customersData = unwrapList(customersResult);
 
         // DEBUG (bật console nếu cần kiểm tra cấu trúc): console.log(ordersData[0])
 

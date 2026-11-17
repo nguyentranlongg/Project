@@ -13,74 +13,14 @@ export default function CheckoutPage() {
     const [items, setItems] = useState([])
     const [paymentMethod, setPaymentMethod] = useState("CASH")
     const [loading, setLoading] = useState(false)
-    const [bankAccountName, setBankAccountName] = useState("")
-    const [bankAccountNumber, setBankAccountNumber] = useState("")
-    const [bankName, setBankName] = useState("")
-    const [bankAccounts, setBankAccounts] = useState([])
-    const [selectedBankAccountId, setSelectedBankAccountId] = useState("")
-    const [savingBank, setSavingBank] = useState(false)
-
-    // Auto-pick default bank when list loaded
-    useEffect(() => {
-        if (bankAccounts && bankAccounts.length > 0 && !selectedBankAccountId) {
-            const def = bankAccounts.find((b) => b.isDefault) || bankAccounts[0]
-            if (def) {
-                setSelectedBankAccountId(String(def.id))
-                setBankAccountName(def.accountHolderName || "")
-                setBankAccountNumber(def.accountNumber || "")
-                setBankName(def.bankName || "")
-            }
-        }
-    }, [bankAccounts, selectedBankAccountId])
-
-    // Khi chọn lại VNPay, nếu đã có tài khoản thì tự đổ vào
-    useEffect(() => {
-        if (paymentMethod === 'VNPAY') {
-            // Nếu chưa có danh sách tài khoản (chưa load) thì fetch ngay — chỉ khi có token
-            const token = localStorage.getItem("access_token")
-            if (token && (!Array.isArray(bankAccounts) || bankAccounts.length === 0) && typeof orderApi.listBankAccounts === 'function') {
-                orderApi.listBankAccounts().then(res => {
-                    const raw = res.data?.data ?? res.data ?? []
-                    const list = Array.isArray(raw) ? raw : []
-                    setBankAccounts(list)
-                    const def = list.find((b) => b.isDefault) || list[0]
-                    if (def) {
-                        setSelectedBankAccountId(String(def.id))
-                        setBankAccountName(def.accountHolderName || "")
-                        setBankAccountNumber(def.accountNumber || "")
-                        setBankName(def.bankName || "")
-                    }
-                }).catch(() => { /* ignore */ })
-            }
-        }
-        if (paymentMethod === 'VNPAY' && Array.isArray(bankAccounts) && bankAccounts.length > 0) {
-            const current = bankAccounts.find((b) => String(b.id) === String(selectedBankAccountId));
-            if (current) {
-                setBankAccountName(current.accountHolderName || "");
-                setBankAccountNumber(current.accountNumber || "");
-                setBankName(current.bankName || "");
-            } else {
-                const def = bankAccounts.find((b) => b.isDefault) || bankAccounts[0];
-                if (def) {
-                    setSelectedBankAccountId(String(def.id));
-                    setBankAccountName(def.accountHolderName || "");
-                    setBankAccountNumber(def.accountNumber || "");
-                    setBankName(def.bankName || "");
-                }
-            }
-        }
-        if (paymentMethod !== 'VNPAY') {
-            // không bắt buộc nhưng giữ nguyên giá trị để user quay lại VNPay vẫn còn
-        }
-    }, [paymentMethod, bankAccounts, selectedBankAccountId])
     const [user, setUser] = useState(null)
     const [showConfirmModal, setShowConfirmModal] = useState(false)
+    const [showQrModal, setShowQrModal] = useState(false)
+    const [qrPayment, setQrPayment] = useState(null)
     const [confirmLoading, setConfirmLoading] = useState(false)
     const [addressDraft, setAddressDraft] = useState("")
     const [editingAddress, setEditingAddress] = useState(false)
     const [savingAddress, setSavingAddress] = useState(false)
-    const [bankInfoRequired, setBankInfoRequired] = useState(false)
-    const [showBankList, setShowBankList] = useState(false)
 
     useEffect(() => {
         try {
@@ -100,19 +40,6 @@ export default function CheckoutPage() {
                     setAddressDraft(u?.address || "")
                 })
                 .catch(err => console.warn('Failed to fetch user info for checkout', err))
-            // fetch saved bank accounts
-            orderApi.listBankAccounts?.().then(res => {
-                const raw = res.data?.data ?? res.data ?? []
-                const list = Array.isArray(raw) ? raw : []
-                setBankAccounts(list)
-                const defaultAcc = list.find((b) => b.isDefault) || list[0]
-                if (defaultAcc) {
-                    setSelectedBankAccountId(String(defaultAcc.id))
-                    setBankAccountName(defaultAcc.accountHolderName || "")
-                    setBankAccountNumber(defaultAcc.accountNumber || "")
-                    setBankName(defaultAcc.bankName || "")
-                }
-            }).catch((err) => { console.warn('Failed to fetch saved bank accounts', err) })
         }
     }, [])
 
@@ -132,20 +59,6 @@ export default function CheckoutPage() {
             alert('Vui lòng nhập địa chỉ giao hàng trước khi thanh toán')
             return
         }
-        // If VNPay selected, require bank refund account info (auto-filled when available)
-        if (paymentMethod === 'VNPAY') {
-            // if any of the bank fields empty, prompt user to fill
-            if (!bankAccountName?.trim() || !bankAccountNumber?.trim() || !bankName?.trim()) {
-                setBankInfoRequired(true)
-                // scroll VNPay section into view if present
-                try {
-                    const el = document.getElementById('vnpay-section')
-                    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                } catch (e) { /* ignore */ }
-                alert('Vui lòng nhập hoặc chọn tài khoản nhận hoàn tiền trước khi thanh toán bằng VNPay')
-                return
-            }
-        }
         setShowConfirmModal(true)
     }
 
@@ -158,30 +71,35 @@ export default function CheckoutPage() {
             return
         }
         try {
-            let res
-            if (paymentMethod === 'VNPAY') {
-                // Cho phép bỏ trống, nếu có sẽ gửi kèm
-                res = await orderApi.createVnPayTransaction(
-                    items,
-                    user?.address,
-                    bankAccountName?.trim() || undefined,
-                    bankAccountNumber?.trim() || undefined,
-                    selectedBankAccountId || undefined,
-                    bankName?.trim() || undefined
-                )
-                const payUrl = res?.data?.paymentUrl || res?.data?.paymentUrl
-                if (payUrl) {
-                    window.location.href = payUrl
-                    return
-                }
-            } else {
-                res = await orderApi.checkout(items, paymentMethod)
-            }
-            // clear cart locally for non-VNPay flows
+            const res = await orderApi.checkout(items, paymentMethod)
+            // clear cart locally after a successful checkout
             localStorage.setItem("cart", JSON.stringify([]))
             window.dispatchEvent(new CustomEvent("cart_update"))
-            // alert("Đặt hàng thành công. Mã đơn hàng: " + (res.data?.id || "(không có)"))
             setShowConfirmModal(false)
+
+            if (paymentMethod === 'VIETQR') {
+                const orderId = res?.data?.id
+                let qr = null
+                if (orderId) {
+                    try {
+                        const qrRes = await orderApi.getQrPayment(orderId)
+                        qr = qrRes?.data
+                    } catch (qrErr) {
+                        console.warn('Failed to load VietQR, using checkout payload', qrErr)
+                    }
+                }
+                setQrPayment({
+                    orderId,
+                    paymentUrl: qr?.paymentUrl || res?.data?.paymentUrl,
+                    amount: qr?.amount ?? res?.data?.tongTien ?? total,
+                    accountName: qr?.accountName,
+                    accountNumber: qr?.accountNumber,
+                    addInfo: qr?.addInfo || (orderId ? `SWEETBAKERY ${orderId}` : ''),
+                })
+                setShowQrModal(true)
+                return
+            }
+
             navigate("/orders")
             return
         } catch (e) {
@@ -309,167 +227,14 @@ export default function CheckoutPage() {
                                         <span className="ml-1">Tiền mặt</span>
                                     </label>
                                     <label className="mt-2 flex items-center gap-3">
-                                        <input type="radio" name="payment" checked={paymentMethod === 'VNPAY'} onChange={() => setPaymentMethod('VNPAY')} />
-                                        <span className="ml-1">VNPay</span>
+                                        <input type="radio" name="payment" checked={paymentMethod === 'VIETQR'} onChange={() => setPaymentMethod('VIETQR')} />
+                                        <span className="ml-1">Chuyển khoản ngân hàng (Quét mã QR)</span>
                                     </label>
-                                    {paymentMethod === 'VNPAY' && (
-                                        <div id="vnpay-section" className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                            <p className="text-sm text-amber-800 font-semibold">Tài khoản nhận hoàn tiền</p>
-                                            <div className="mb-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={async () => {
-                                                        const token = localStorage.getItem('access_token')
-                                                        if (!token) {
-                                                            alert('Vui lòng đăng nhập để chọn tài khoản đã lưu')
-                                                            return
-                                                        }
-                                                        // fetch if not loaded
-                                                        if ((!Array.isArray(bankAccounts) || bankAccounts.length === 0) && typeof orderApi.listBankAccounts === 'function') {
-                                                            try {
-                                                                const res = await orderApi.listBankAccounts()
-                                                                const raw = res.data?.data ?? res.data ?? []
-                                                                const list = Array.isArray(raw) ? raw : []
-                                                                setBankAccounts(list)
-                                                            } catch (err) {
-                                                                console.warn('Failed to fetch bank accounts on choose', err)
-                                                            }
-                                                        }
-                                                        setShowBankList((s) => !s)
-                                                    }}
-                                                    className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm text-amber-800 hover:bg-amber-100"
-                                                >
-                                                    Chọn tài khoản có sẵn
-                                                </button>
-                                            </div>
-                                            {Array.isArray(bankAccounts) && bankAccounts.length > 0 && (
-                                                <select
-                                                    className="w-full rounded-md border border-stone-200 p-2 text-sm"
-                                                    value={selectedBankAccountId}
-                                                    onChange={(e) => {
-                                                        const id = e.target.value
-                                                        setSelectedBankAccountId(id)
-                                                        const found = (Array.isArray(bankAccounts) ? bankAccounts : []).find((b) => String(b.id) === String(id))
-                                                        if (found) {
-                                                            setBankAccountName(found.accountHolderName || "")
-                                                            setBankAccountNumber(found.accountNumber || "")
-                                                            setBankName(found.bankName || "")
-                                                        }
-                                                    }}
-                                                >
-                                                    <option value="">-- Chọn tài khoản đã lưu --</option>
-                                                    {(Array.isArray(bankAccounts) ? bankAccounts : []).map((b) => (
-                                                        <option key={b.id} value={b.id}>
-                                                            {b.accountHolderName} - {b.accountNumber} ({b.bankName})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            )}
-                                            {showBankList && (
-                                                <div className="mt-2 space-y-2 rounded-md border border-stone-100 bg-white p-2">
-                                                    {(!Array.isArray(bankAccounts) || bankAccounts.length === 0) ? (
-                                                        <div className="text-sm text-stone-500">Không có tài khoản đã lưu</div>
-                                                    ) : (
-                                                        bankAccounts.map((b) => (
-                                                            <div key={b.id} className="flex items-center justify-between gap-3 rounded-md p-2 hover:bg-stone-50">
-                                                                <div className="text-sm">
-                                                                    <div className="font-medium text-stone-800">{b.accountHolderName}</div>
-                                                                    <div className="text-xs text-stone-500">{b.accountNumber} — {b.bankName}</div>
-                                                                </div>
-                                                                <div>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setSelectedBankAccountId(String(b.id))
-                                                                            setBankAccountName(b.accountHolderName || "")
-                                                                            setBankAccountNumber(b.accountNumber || "")
-                                                                            setBankName(b.bankName || "")
-                                                                            setShowBankList(false)
-                                                                        }}
-                                                                        className="rounded-full bg-amber-800 px-3 py-1 text-sm text-white"
-                                                                    >
-                                                                        Chọn
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            )}
-                                            <input
-                                                type="text"
-                                                className="w-full rounded-md border border-stone-200 p-2 text-sm"
-                                                placeholder="Tên chủ tài khoản"
-                                                value={bankAccountName}
-                                                onChange={(e) => setBankAccountName(e.target.value)}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full rounded-md border border-stone-200 p-2 text-sm"
-                                                placeholder="Số tài khoản"
-                                                value={bankAccountNumber}
-                                                onChange={(e) => setBankAccountNumber(e.target.value)}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full rounded-md border border-stone-200 p-2 text-sm"
-                                                placeholder="Tên ngân hàng"
-                                                value={bankName}
-                                                onChange={(e) => setBankName(e.target.value)}
-                                            />
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    disabled={savingBank || !bankAccountNumber.trim() || !bankAccountName.trim() || !bankName.trim()}
-                                                    onClick={async () => {
-                                                        try {
-                                                            setSavingBank(true)
-                                                            await orderApi.createBankAccount({
-                                                                bankName: bankName.trim(),
-                                                                accountHolderName: bankAccountName.trim(),
-                                                                accountNumber: bankAccountNumber.trim(),
-                                                                isDefault: true,
-                                                            })
-                                                            const res = await orderApi.listBankAccounts()
-                                                            const rawList = res.data?.data ?? res.data ?? []
-                                                            const list = Array.isArray(rawList) ? rawList : []
-                                                            setBankAccounts(list)
-                                                            const def = list.find((b) => b.isDefault) || list[0]
-                                                            if (def) {
-                                                                setSelectedBankAccountId(String(def.id))
-                                                                setBankAccountName(def.accountHolderName || "")
-                                                                setBankAccountNumber(def.accountNumber || "")
-                                                                setBankName(def.bankName || "")
-                                                            }
-                                                            alert("Đã lưu tài khoản ngân hàng")
-                                                        } catch (err) {
-                                                            console.error(err)
-                                                            alert("Lưu tài khoản thất bại")
-                                                        } finally {
-                                                            setSavingBank(false)
-                                                        }
-                                                    }}
-                                                    className="rounded-full bg-amber-800 px-3 py-1 text-sm text-white disabled:opacity-50"
-                                                >
-                                                    {savingBank ? "Đang lưu..." : "Lưu tài khoản"}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="rounded-full border border-stone-200 px-3 py-1 text-sm"
-                                                    onClick={() => {
-                                                        setSelectedBankAccountId("")
-                                                        setBankAccountName("")
-                                                        setBankAccountNumber("")
-                                                        setBankName("")
-                                                    }}
-                                                >
-                                                    Nhập mới
-                                                </button>
-                                            </div>
-                                            <p className="text-xs text-amber-700">Lưu sẵn để tự động điền cho lần thanh toán sau.</p>
-                                            {bankInfoRequired && (!bankAccountName?.trim() || !bankAccountNumber?.trim() || !bankName?.trim()) && (
-                                                <div className="mt-2 text-sm text-red-600">Vui lòng nhập/chọn tài khoản nhận hoàn tiền để tiếp tục.</div>
-                                            )}
+                                    {paymentMethod === 'VIETQR' && (
+                                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                            <p className="font-semibold">Chuyển khoản QR Ngân hàng (VietQR)</p>
+                                            <p className="mt-1">Mã QR kèm số tiền chính xác sẽ hiển thị ngay sau khi bạn bấm Thanh toán.</p>
+                                            <p className="mt-1 text-xs text-amber-700">Nội dung chuyển khoản: SWEETBAKERY &lt;mã đơn&gt;</p>
                                         </div>
                                     )}
                                 </div>
@@ -491,17 +256,24 @@ export default function CheckoutPage() {
                 total={total}
                 address={user?.address}
                 paymentMethod={paymentMethod}
-                bankAccountName={bankAccountName}
-                bankAccountNumber={bankAccountNumber}
-                bankName={bankName}
                 loading={confirmLoading}
+            />
+            <QrPaymentModal
+                open={showQrModal}
+                qr={qrPayment}
+                onViewOrder={() => {
+                    const orderId = qrPayment?.orderId
+                    setShowQrModal(false)
+                    if (orderId) navigate(`/orders/${orderId}`)
+                    else navigate("/orders")
+                }}
             />
         </>
     )
 }
 
 // Confirmation modal
-function ConfirmModal({ open, onClose, onConfirm, items, total, address, paymentMethod, bankAccountName, bankAccountNumber, bankName, loading }) {
+function ConfirmModal({ open, onClose, onConfirm, items, total, address, paymentMethod, loading }) {
     if (!open) return null
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -530,15 +302,11 @@ function ConfirmModal({ open, onClose, onConfirm, items, total, address, payment
                     </div>
                     <div className="text-sm text-stone-600">
                         <div className="font-semibold">Phương thức thanh toán</div>
-                        <div className="text-stone-800">{paymentMethod}</div>
+                        <div className="text-stone-800">{paymentMethodLabel(paymentMethod)}</div>
                     </div>
-                    {paymentMethod === 'VNPAY' && (
+                    {paymentMethod === 'VIETQR' && (
                         <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-amber-800 text-sm">
-                            <div className="font-semibold">Tài khoản nhận hoàn tiền</div>
-                            <div className="mt-1">{bankAccountName || 'Chưa có tên chủ tài khoản'}</div>
-                            <div className="mt-1">Số tài khoản: {bankAccountNumber || 'Chưa có'}</div>
-                            <div className="mt-1">Ngân hàng: {bankName || 'Chưa có'}</div>
-                            <div className="mt-2 text-xs text-amber-700">Nếu thông tin trống, hãy nhập tài khoản nhận hoàn tiền ở phần VNPay trên trang thanh toán trước khi xác nhận.</div>
+                            Mã QR kèm số tiền chính xác sẽ hiển thị ngay sau khi bạn xác nhận đơn hàng.
                         </div>
                     )}
                     {!address && (
@@ -554,4 +322,40 @@ function ConfirmModal({ open, onClose, onConfirm, items, total, address, payment
     )
 }
 
-export { ConfirmModal }
+function paymentMethodLabel(method) {
+    if (method === 'CASH') return 'Tiền mặt'
+    if (method === 'VNPAY') return 'VNPay'
+    if (method === 'VIETQR' || method === 'BANK_TRANSFER') return 'Chuyển khoản QR Ngân hàng (VietQR)'
+    return method
+}
+
+function QrPaymentModal({ open, qr, onViewOrder }) {
+    if (!open || !qr) return null
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+                <h3 className="mb-2 text-lg font-bold text-stone-800">Quét mã VietQR để thanh toán</h3>
+                <p className="mb-4 text-sm text-stone-600">
+                    Mở ứng dụng ngân hàng, quét mã và chuyển đúng số tiền, đúng nội dung để đơn được đối soát nhanh.
+                </p>
+                {qr.paymentUrl ? (
+                    <img src={qr.paymentUrl} alt="VietQR" className="mx-auto mb-4 h-64 w-64 rounded-md border border-stone-100 object-contain bg-white" />
+                ) : (
+                    <div className="mb-4 rounded-md bg-stone-50 p-4 text-center text-sm text-stone-500">Không tải được mã QR. Vui lòng xem lại đơn hàng.</div>
+                )}
+                <div className="space-y-1 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div>Số tiền: <span className="font-bold">{formatPrice(qr.amount)}</span></div>
+                    {qr.accountName && <div>Chủ tài khoản: <span className="font-semibold">{qr.accountName}</span></div>}
+                    {qr.accountNumber && <div>Số tài khoản: <span className="font-semibold">{qr.accountNumber}</span></div>}
+                    {qr.addInfo && <div>Nội dung CK: <span className="font-semibold">{qr.addInfo}</span></div>}
+                </div>
+                <button onClick={onViewOrder} className="mt-5 w-full rounded-full bg-amber-800 px-4 py-3 text-white shadow hover:shadow-lg">
+                    Tôi đã chuyển khoản / Xem đơn hàng
+                </button>
+            </div>
+        </div>
+    )
+}
+
+export { ConfirmModal, QrPaymentModal }

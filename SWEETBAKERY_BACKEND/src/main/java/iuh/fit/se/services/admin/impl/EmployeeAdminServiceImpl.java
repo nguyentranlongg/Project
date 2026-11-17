@@ -59,12 +59,7 @@ public class EmployeeAdminServiceImpl implements EmployeeAdminService {
             throw new AppException(HttpCode.USERNAME_EXISTED);
 
         Employee employee = employeeMapper.toEmployee(request);
-
-        Set<Role> roles = null;
-        if(request.getRoles() != null){
-            roles = new HashSet<>(roleRepository.findAllById(request.getRoles()));
-            employee.setRoles(roles);
-        }
+        employee.setRoles(resolveStaffRoles(request.getRoles()));
 
         employeeRepository.save(employee);
 
@@ -133,9 +128,8 @@ public class EmployeeAdminServiceImpl implements EmployeeAdminService {
             );
         }
 
-        if(request.getRoles() != null && !request.getRoles().isEmpty()){
-            Set<Role> roles = new HashSet<>(roleRepository.findAllById(request.getRoles()));
-            employee.setRoles(roles);
+        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+            employee.setRoles(resolveStaffRoles(request.getRoles()));
         }
 
         employeeRepository.save(employee);
@@ -145,5 +139,43 @@ public class EmployeeAdminServiceImpl implements EmployeeAdminService {
         if(passwordIsChanging) employeeUpdateResponse.setNewPassword(request.getNewPassword());
         employeeUpdateResponse.setIsVerified(request.getIsVerified());
         return employeeUpdateResponse;
+    }
+
+    private static final Set<String> ASSIGNABLE_STAFF_ROLES = Set.of(
+            UserRole.SALES.name(),
+            UserRole.IMPORT_STAFF.name(),
+            UserRole.INVENTORY_MANAGER.name(),
+            UserRole.ACCOUNTANT.name(),
+            UserRole.EMPLOYEE.name(),
+            UserRole.ADMIN.name(),
+            UserRole.CUSTOMER.name()
+    );
+
+    private Set<Role> resolveStaffRoles(List<String> roleNames) {
+        if (roleNames == null || roleNames.isEmpty()) {
+            throw new AppException(HttpCode.BAD_REQUEST);
+        }
+        Set<Role> roles = new HashSet<>();
+        for (String name : roleNames) {
+            String normalized = normalizeRoleName(name);
+            if (normalized.isEmpty() || !ASSIGNABLE_STAFF_ROLES.contains(normalized)) {
+                throw new AppException(HttpCode.BAD_REQUEST);
+            }
+            Role role = roleRepository.findById(normalized)
+                    .orElseThrow(() -> new AppException(HttpCode.ROLE_NOT_FOUND));
+            roles.add(role);
+        }
+        return roles;
+    }
+
+    private String normalizeRoleName(String name) {
+        if (name == null) {
+            return "";
+        }
+        String normalized = name.trim().toUpperCase().replace(' ', '_').replace('-', '_');
+        if (normalized.startsWith("ROLE_")) {
+            normalized = normalized.substring(5);
+        }
+        return normalized;
     }
 }

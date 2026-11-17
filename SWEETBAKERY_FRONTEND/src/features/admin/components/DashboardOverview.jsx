@@ -24,15 +24,24 @@ export default function DashboardOverview() {
     async function load() {
       try {
         setLoading(true);
-        const [ordersRes, pastriesRes, customersRes] = await Promise.all([
+        const [ordersResult, pastriesResult, customersResult] = await Promise.allSettled([
           adminApi.getAllOrders(),
           adminApi.getAdminPastries(),
           adminApi.getAllCustomers(),
         ]);
 
-        const orders = (ordersRes.data?.data) || [];
-        const pastries = (pastriesRes.data?.data) || [];
-        const customers = (customersRes.data?.data) || [];
+        const unwrapList = (result) => {
+          if (result.status !== "fulfilled") {
+            console.warn("Dashboard overview metric failed", result.reason);
+            return [];
+          }
+          const payload = result.value?.data?.data ?? result.value?.data;
+          return Array.isArray(payload) ? payload : [];
+        };
+
+        const orders = unwrapList(ordersResult);
+        const pastries = unwrapList(pastriesResult);
+        const customers = unwrapList(customersResult);
 
         // total revenue (sum tongTien)
         const revenue = orders.reduce((s, o) => {

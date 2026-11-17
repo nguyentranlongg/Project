@@ -10,6 +10,7 @@ import iuh.fit.se.entities.enums.PastryStatus;
 import iuh.fit.se.mapper.PastryMapper;
 import iuh.fit.se.repositories.PastryCategoryRepository;
 import iuh.fit.se.repositories.PastryRepository;
+import iuh.fit.se.services.WarehouseInventoryService;
 import iuh.fit.se.services.admin.PastryAdminService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class PastryAdminServiceImpl implements PastryAdminService {
     PastryRepository pastryRepository;
     PastryCategoryRepository pastryCategoryRepository;
     PastryMapper pastryMapper;
+    WarehouseInventoryService warehouseInventoryService;
 
     @Override
     public PastryCreationResponse findById(String id) {
@@ -39,10 +41,12 @@ public class PastryAdminServiceImpl implements PastryAdminService {
 
     @Override
     public List<PastryCreationResponse> findAll() {
-        return pastryRepository.findAll()
+        List<PastryCreationResponse> pastries = pastryRepository.findAll()
                 .stream()
                 .map(pastryMapper::toPastryCreationResponse)
                 .collect(Collectors.toList());
+        warehouseInventoryService.attachNearestExpiry(pastries);
+        return pastries;
     }
 
     @Override

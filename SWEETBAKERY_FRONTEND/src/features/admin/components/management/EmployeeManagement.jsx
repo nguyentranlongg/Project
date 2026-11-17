@@ -1,6 +1,28 @@
 import React, { useEffect, useState, useCallback } from "react";
 import adminApi from "./../../apis/adminApi";
 
+const STAFF_ROLES = [
+  { name: "SALES", label: "Nhân viên bán hàng" },
+  { name: "IMPORT_STAFF", label: "Nhân viên nhập kho / Bếp" },
+  { name: "INVENTORY_MANAGER", label: "Nhân viên quản lý kho" },
+  { name: "ACCOUNTANT", label: "Nhân viên kế toán" },
+  { name: "EMPLOYEE", label: "Nhân viên chung" },
+  { name: "ADMIN", label: "Quản trị viên" },
+];
+
+const ROLE_BADGE_CLASS = {
+  SALES: "bg-sky-100 text-sky-800",
+  IMPORT_STAFF: "bg-amber-100 text-amber-800",
+  INVENTORY_MANAGER: "bg-violet-100 text-violet-800",
+  ACCOUNTANT: "bg-emerald-100 text-emerald-800",
+  EMPLOYEE: "bg-slate-100 text-slate-700",
+  ADMIN: "bg-rose-100 text-rose-800",
+};
+
+function roleLabel(name) {
+  return STAFF_ROLES.find((role) => role.name === name)?.label || name;
+}
+
 export default function EmployeeManagement() {
   const [showForm, setShowForm] = useState(false);
   const [users, setUsers] = useState([]);
@@ -40,6 +62,7 @@ export default function EmployeeManagement() {
           email: u.email,
           phone: u.phoneNumber,
           roleName: u.roles?.[0]?.name || "N/A",
+          roleNames: u.roles ? u.roles.map((r) => r.name) : [],
 
           // --- FIX 1: Xử lý null ngay tại nguồn ---
           // Nếu u.isVerified là null => coi như true (Kích hoạt), ngược lại giữ nguyên
@@ -116,6 +139,12 @@ export default function EmployeeManagement() {
     setLoading(true);
 
     try {
+      if (!formData.roles.length) {
+        alert("Chọn ít nhất một vai trò.");
+        setLoading(false);
+        return;
+      }
+
       const experience = parseInt(formData.numOfExperience) || 0;
       let res;
 
@@ -330,23 +359,19 @@ export default function EmployeeManagement() {
             {/* ROLES CHECKBOX */}
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-slate-700">Vai trò</label>
-              <div className="flex gap-4 mt-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.roles.includes("EMPLOYEE")}
-                    onChange={() => handleRoleChange("EMPLOYEE")}
-                  />
-                  <span>Nhân viên (EMPLOYEE)</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.roles.includes("ADMIN")}
-                    onChange={() => handleRoleChange("ADMIN")}
-                  />
-                  <span>Quản trị viên (ADMIN)</span>
-                </label>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {STAFF_ROLES.map((role) => (
+                  <label key={role.name} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={formData.roles.includes(role.name)}
+                      onChange={() => handleRoleChange(role.name)}
+                    />
+                    <span>
+                      {role.label} ({role.name})
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -466,7 +491,18 @@ export default function EmployeeManagement() {
                 <td className="px-4 py-3 text-slate-600 font-medium">{user.username}</td>
                 <td className="px-4 py-3 text-slate-600">{user.email}</td>
                 <td className="px-4 py-3 text-slate-600">{user.phone}</td>
-                <td className="px-4 py-3 text-slate-600">{user.roleName}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {(user.roleNames?.length ? user.roleNames : [user.roleName]).filter(Boolean).map((name) => (
+                      <span
+                        key={name}
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_BADGE_CLASS[name] || "bg-slate-100 text-slate-700"}`}
+                      >
+                        {roleLabel(name)}
+                      </span>
+                    ))}
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${user.isVerified ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}

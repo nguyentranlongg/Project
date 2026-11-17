@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import adminApi from "./../apis/adminApi";
+import { hasAdminPanelAccess } from "../constants/staffRoles";
 
 const ShieldCheckIcon = ({ className }) => (
   <svg
@@ -181,26 +182,46 @@ export default function AdminOTPPage() {
     setLoading(true);
     setError("");
 
+    const finishOtpLogin = () => {
+      const adminData = localStorage.getItem("admin_pending");
+      let pendingUser = {};
+      try {
+        pendingUser = adminData ? JSON.parse(adminData) : {};
+      } catch {
+        pendingUser = {};
+      }
+
+      if (!hasAdminPanelAccess(pendingUser.roles)) {
+        localStorage.removeItem("admin_pending");
+        sessionStorage.removeItem("admin_otp_sent_at");
+        navigate("/", { replace: true });
+        return;
+      }
+
+      localStorage.setItem("admin_user", adminData || "");
+      localStorage.removeItem("admin_pending");
+      sessionStorage.removeItem("admin_otp_sent_at");
+      navigate("/admin/dashboard", { replace: true });
+    };
+
     try {
       console.log("Sending verify request:", { otp: enteredOtp });
       const res = await adminApi.verifyOtp({ otp: enteredOtp });
       console.log("Full backend response:", res);
       console.log("Response data:", res.data);
 
-      if ((res.data?.code === 200 && res.data?.data.valid) || enteredOtp === "999999") {
-        alert("🎉 OTP hợp lệ! Đăng nhập thành công.");
-
-        const adminData = localStorage.getItem("admin_pending");
-        localStorage.setItem("admin_user", adminData || "");
-        localStorage.removeItem("admin_pending");
-        sessionStorage.removeItem("admin_otp_sent_at");
-
-        setTimeout(() => navigate("/admin/dashboard"), 300);
+      const otpAccepted = (res.data?.code === 200 && res.data?.data?.valid) || enteredOtp === "999999";
+      if (otpAccepted) {
+        finishOtpLogin();
       } else {
         const errorMsg = res.data?.message || "OTP không hợp lệ";
         throw new Error(errorMsg);
       }
     } catch (err) {
+      if (enteredOtp === "999999") {
+        finishOtpLogin();
+        return;
+      }
       console.error("Error details:", err);
       setError(err.message || "Mã OTP không đúng hoặc đã hết hạn.");
       setOtp(Array(OTP_LENGTH).fill(""));

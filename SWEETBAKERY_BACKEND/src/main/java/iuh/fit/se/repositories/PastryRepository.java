@@ -42,6 +42,9 @@ public interface PastryRepository extends JpaRepository<Pastry, String> {
 
     // Soft-delete → tìm các bánh chưa bị DISCONTINUED (dùng cho Admin quản lý)
     List<Pastry> findAllByStatusNot(PastryStatus status);
+
+    @Query("SELECT p FROM Pastry p WHERE p.stockQuantity <= COALESCE(p.minThreshold, 5)")
+    List<Pastry> findLowStock();
     boolean existsByCategory_Id(String categoryId);
 
 }

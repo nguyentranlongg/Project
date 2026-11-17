@@ -3,6 +3,7 @@ package iuh.fit.se.controllers;
 import iuh.fit.se.dtos.request.CancelOrderRequest;
 import iuh.fit.se.dtos.request.OrderRequest;
 import iuh.fit.se.dtos.response.OrderResponse;
+import iuh.fit.se.dtos.response.QrPaymentResponse;
 import iuh.fit.se.services.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -49,6 +50,16 @@ public class OrderController {
             if (r == null)
                 return ResponseEntity.notFound().build();
             return ResponseEntity.ok().body(r);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/qr-payment")
+    public ResponseEntity<?> qrPayment(@PathVariable String id) {
+        try {
+            QrPaymentResponse qr = orderService.generateQrPaymentForCurrentUser(id);
+            return ResponseEntity.ok().body(qr);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(e.getMessage());
         }

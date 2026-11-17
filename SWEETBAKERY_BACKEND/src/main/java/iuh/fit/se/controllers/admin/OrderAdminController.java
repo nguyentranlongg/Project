@@ -1,5 +1,6 @@
 package iuh.fit.se.controllers.admin;
 
+import iuh.fit.se.dtos.request.OrderRequest;
 import iuh.fit.se.dtos.request.OrderUpdateStatusRequest;
 import iuh.fit.se.dtos.response.ApiResponse;
 import iuh.fit.se.dtos.response.OrderResponse;
@@ -35,6 +36,15 @@ public class OrderAdminController {
                 .code(HttpCode.OK.getCODE())
                 .message(HttpCode.OK.getMESSAGE())
                 .data(orderAdminService.getOrderById(id))
+                .build();
+    }
+
+    @PostMapping("/create-counter-order")
+    ApiResponse<OrderResponse> createCounterOrder(@RequestBody OrderRequest request) {
+        return ApiResponse.<OrderResponse>builder()
+                .code(HttpCode.OK.getCODE())
+                .message(HttpCode.OK.getMESSAGE())
+                .data(orderAdminService.createCounterOrder(request))
                 .build();
     }
 

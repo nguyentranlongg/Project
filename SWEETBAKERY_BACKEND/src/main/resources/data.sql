@@ -30,6 +30,10 @@ INSERT IGNORE  INTO `permissions` VALUES
 
 INSERT IGNORE INTO `roles` VALUES
 ('ADMIN','All permission!'),
+('SALES','Sales staff'),
+('IMPORT_STAFF','Import stock staff'),
+('INVENTORY_MANAGER','Inventory manager'),
+('ACCOUNTANT','Accountant'),
 ('GUEST','Guest permission!'),
 ('EMPLOYEE','Employee permission!'),
 ('CUSTOMER','Member permission!');
@@ -51,4 +55,7 @@ INSERT IGNORE  INTO roles_permissions (role_name, permissions_name) VALUES
 ('CUSTOMER', 'PASTRY:FIND'),
 
 ('GUEST', 'PASTRY:FIND');
+
+UPDATE pastries SET min_threshold = 5 WHERE min_threshold IS NULL OR min_threshold = 0;
+UPDATE pastries SET shelf_life_days = 2 WHERE shelf_life_days IS NULL;
 

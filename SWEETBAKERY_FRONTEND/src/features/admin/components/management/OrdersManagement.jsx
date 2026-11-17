@@ -42,6 +42,40 @@ function statusLabel(status) {
   }
 }
 
+function paymentMethodKey(method) {
+  return String(method || "").trim().toUpperCase().replace(/[-\s]/g, "_");
+}
+
+function isQrTransferMethod(method) {
+  const key = paymentMethodKey(method);
+  return key === "VIETQR" || key === "BANK_TRANSFER";
+}
+
+function paymentMethodLabel(method) {
+  const key = paymentMethodKey(method);
+  if (key === "CASH" || key === "TIEN_MAT") return "Tiền mặt";
+  if (key === "VIETQR" || key === "BANK_TRANSFER") return "Chuyển khoản QR";
+  if (key === "VNPAY" || key === "VN_PAY") return "VNPay";
+  return method || "N/A";
+}
+
+function isPaymentPaid(order) {
+  const status = String(order?.paymentStatus || "").toUpperCase();
+  if (status === "PAID") return true;
+  if (status === "PENDING") return false;
+  return String(order?.trangThai || "").toUpperCase() === "PAID";
+}
+
+function paymentStatusLabel(order) {
+  return isPaymentPaid(order) ? "Đã thanh toán" : "Chưa thanh toán";
+}
+
+function paymentStatusClass(order) {
+  return isPaymentPaid(order)
+    ? "bg-green-100 text-green-700"
+    : "bg-slate-100 text-slate-600";
+}
+
 function statusClass(status) {
   switch (status) {
     case "PENDING":
@@ -83,6 +117,10 @@ export default function OrdersManagement() {
   const [refundProofImageUrl, setRefundProofImageUrl] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [qrOrder, setQrOrder] = useState(null);
+  const [qrUrl, setQrUrl] = useState("");
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrConfirming, setQrConfirming] = useState(false);
 
   // Fetch orders
   const fetchOrders = async () => {
@@ -103,6 +141,44 @@ export default function OrdersManagement() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const canConfirmQr = (order) =>
+    isQrTransferMethod(order.paymentMethod) &&
+    !isPaymentPaid(order) &&
+    order.trangThai !== "CANCELLED" &&
+    order.trangThai !== "COMPLETED";
+
+  const openQrModal = async (order) => {
+    setQrOrder(order);
+    setQrUrl("");
+    setQrLoading(true);
+    try {
+      const res = await adminApi.generateQrPayment(order.id);
+      setQrUrl(res.data?.data?.paymentUrl || "");
+    } catch (err) {
+      console.error(err);
+      alert("Không tạo được mã QR thanh toán.");
+      setQrOrder(null);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handlePaymentReceived = async () => {
+    if (!qrOrder) return;
+    setQrConfirming(true);
+    try {
+      await adminApi.confirmQrPayment(qrOrder.id);
+      setQrOrder(null);
+      setQrUrl("");
+      await fetchOrders();
+    } catch (err) {
+      console.error(err);
+      alert("Không xác nhận được thanh toán.");
+    } finally {
+      setQrConfirming(false);
+    }
+  };
 
   // Filter orders
   useEffect(() => {
@@ -155,7 +231,8 @@ export default function OrdersManagement() {
       fetchOrders();
     } catch (err) {
       console.error("Confirm order failed:", err);
-      alert("Không thể xác nhận đơn hàng!");
+      const apiMessage = err.response?.data?.message || err.message;
+      alert(apiMessage || "Không thể xác nhận đơn hàng!");
     }
   };
 
@@ -248,6 +325,7 @@ export default function OrdersManagement() {
                 <th className="px-4 py-3 font-semibold text-slate-600">Khách hàng</th>
                 <th className="px-4 py-3 font-semibold text-slate-600">Số mặt hàng</th>
                 <th className="px-4 py-3 font-semibold text-slate-600">Tổng tiền</th>
+                <th className="px-4 py-3 font-semibold text-slate-600">Thanh toán</th>
                 <th className="px-4 py-3 font-semibold text-slate-600">Trạng thái</th>
                 <th className="px-4 py-3 font-semibold text-slate-600">Ngày đặt</th>
                 <th className="px-4 py-3 font-semibold text-slate-600">Hành động</th>
@@ -261,6 +339,16 @@ export default function OrdersManagement() {
                   <td className="px-4 py-3 text-slate-600">{order.items?.length || 0}</td>
                   <td className="px-4 py-3 font-semibold text-amber-600">{formatPrice(order.tongTien)}</td>
                   <td className="px-4 py-3">
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                        {paymentMethodLabel(order.paymentMethod)}
+                      </span>
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${paymentStatusClass(order)}`}>
+                        {paymentStatusLabel(order)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClass(order.trangThai)}`}>
                       {statusLabel(order.trangThai)}
                     </span>
@@ -273,6 +361,14 @@ export default function OrdersManagement() {
                     >
                       Chi tiết
                     </button>
+                    {canConfirmQr(order) && (
+                      <button
+                        onClick={() => openQrModal(order)}
+                        className="text-emerald-700 hover:text-emerald-800 font-medium"
+                      >
+                        Xác nhận QR
+                      </button>
+                    )}
                     {(order.trangThai === "PAID" || order.trangThai === "PENDING") && (
                       <button
                         onClick={() => handleConfirmOrder(order.id)}
@@ -330,8 +426,11 @@ export default function OrdersManagement() {
                   <p className="font-semibold text-slate-800">{selectedOrder.customerAddress || "N/A"}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Phương thức thanh toán</p>
-                  <p className="font-semibold text-slate-800">{selectedOrder.paymentMethod || "N/A"}</p>
+                  <p className="text-sm text-slate-500">Thanh toán</p>
+                  <p className="font-semibold text-slate-800">{paymentMethodLabel(selectedOrder.paymentMethod)}</p>
+                  <p className={`mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${paymentStatusClass(selectedOrder)}`}>
+                    {paymentStatusLabel(selectedOrder)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Trạng thái</p>
@@ -488,6 +587,47 @@ export default function OrdersManagement() {
                 className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
               >
                 Đã hoàn tiền
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {qrOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-6 py-4">
+              <h3 className="text-xl font-bold text-slate-800">Xác nhận thanh toán QR</h3>
+              <p className="mt-1 text-sm text-slate-600">Mã đơn: {qrOrder.id}</p>
+            </div>
+            <div className="space-y-4 p-6 text-center">
+              <p className="text-sm text-slate-600">
+                Số tiền: <span className="font-semibold text-amber-700">{formatPrice(qrOrder.tongTien)}</span>
+              </p>
+              {qrLoading ? (
+                <p className="text-sm text-slate-500">Đang tạo mã QR...</p>
+              ) : qrUrl ? (
+                <img src={qrUrl} alt="VietQR" className="mx-auto h-64 w-64 rounded-lg border border-slate-200 object-contain" />
+              ) : (
+                <p className="text-sm text-red-600">Không có mã QR.</p>
+              )}
+            </div>
+            <div className="flex gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                onClick={() => {
+                  setQrOrder(null);
+                  setQrUrl("");
+                }}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-700 hover:bg-slate-50"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={handlePaymentReceived}
+                disabled={qrConfirming || qrLoading || !qrUrl}
+                className="flex-1 rounded-lg bg-emerald-700 px-4 py-2 text-white hover:bg-emerald-800 disabled:opacity-60"
+              >
+                {qrConfirming ? "Đang lưu..." : "Đã nhận tiền"}
               </button>
             </div>
           </div>

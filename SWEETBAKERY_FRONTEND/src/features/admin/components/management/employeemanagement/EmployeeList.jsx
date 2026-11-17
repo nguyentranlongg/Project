@@ -1,5 +1,23 @@
 import React from "react";
 
+const ROLE_LABELS = {
+  SALES: "Nhân viên bán hàng",
+  IMPORT_STAFF: "Nhân viên nhập kho / Bếp",
+  INVENTORY_MANAGER: "Nhân viên quản lý kho",
+  ACCOUNTANT: "Nhân viên kế toán",
+  EMPLOYEE: "Nhân viên chung",
+  ADMIN: "Quản trị viên",
+};
+
+const ROLE_BADGE_CLASS = {
+  SALES: "bg-sky-100 text-sky-800",
+  IMPORT_STAFF: "bg-amber-100 text-amber-800",
+  INVENTORY_MANAGER: "bg-violet-100 text-violet-800",
+  ACCOUNTANT: "bg-emerald-100 text-emerald-800",
+  EMPLOYEE: "bg-slate-100 text-slate-700",
+  ADMIN: "bg-rose-100 text-rose-800",
+};
+
 export default function EmployeeList({ users, onEdit, onDelete }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -28,7 +46,18 @@ export default function EmployeeList({ users, onEdit, onDelete }) {
 
                 <td className="px-4 py-3 text-slate-600">{user.email}</td>
                 <td className="px-4 py-3 text-slate-600">{user.phone}</td>
-                <td className="px-4 py-3 text-slate-600">{user.roleName}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {(user.roles?.length ? user.roles : [user.roleName]).filter(Boolean).map((name) => (
+                      <span
+                        key={name}
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_BADGE_CLASS[name] || "bg-slate-100 text-slate-700"}`}
+                      >
+                        {ROLE_LABELS[name] || name}
+                      </span>
+                    ))}
+                  </div>
+                </td>
 
                 {/* Hiển thị Trạng thái (Màu sắc theo isVerified) */}
                 <td className="px-4 py-3">

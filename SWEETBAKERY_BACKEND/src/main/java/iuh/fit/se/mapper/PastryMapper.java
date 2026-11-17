@@ -32,6 +32,7 @@ public interface PastryMapper {
             expression = "java(pastry.getCategory() != null ? pastry.getCategory().getId() : null)")
     @Mapping(target = "categoryName",
             expression = "java(pastry.getCategory() != null ? pastry.getCategory().getName() : null)")
+    @Mapping(target = "nearestExpiryDate", ignore = true)
     PastryCreationResponse toPastryCreationResponse(Pastry pastry);
 
     // Entity -> UpdateResponse: map thêm categoryId, categoryName

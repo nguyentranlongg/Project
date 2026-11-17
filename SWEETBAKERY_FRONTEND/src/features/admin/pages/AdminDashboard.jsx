@@ -8,12 +8,17 @@ import SettingsView from "../components/SettingsView";
 import EmployeeManagement from "../components/management/EmployeeManagement";
 import CustomerManagement from "./../components/management/CustomerManagement";
 import authApi from "../../auth/apis/authApi";
+import { extractRoleNames, hasAdminPanelAccess } from "../constants/staffRoles";
 
 // lazy load management pages
 const PastriesManagement = lazy(() => import("../components/management/PastriesManagement"));
 const CategoriesManagement = lazy(() => import("../components/management/CategoriesManagement"));
 const UsersManagement = lazy(() => import("../components/management/UsersManagement"));
 const OrdersManagement = lazy(() => import("../components/management/OrdersManagement"));
+const InventoryReceiptsManagement = lazy(() => import("../components/management/InventoryReceiptsManagement"));
+const StockManagement = lazy(() => import("../components/management/StockManagement"));
+const AccountingDashboard = lazy(() => import("../components/management/AccountingDashboard"));
+const EmployeePerformanceView = lazy(() => import("../components/management/EmployeePerformanceView"));
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -34,11 +39,13 @@ export default function AdminDashboard() {
 
       try {
         const res = await authApi.getInformation();
-        if (res.data?.code === 200 && res.data?.data?.roles) {
-          // Extract role names từ roles array
-          const roles = res.data.data.roles.map((r) => r.name);
+        if (res.data?.code === 200 && res.data?.data) {
+          const roles = extractRoleNames(res.data.data.roles);
+          if (!hasAdminPanelAccess(roles)) {
+            navigate("/", { replace: true });
+            return;
+          }
           setUserRoles(roles);
-          console.log("User roles:", roles);
         } else {
           navigate("/admin");
         }
@@ -62,6 +69,10 @@ export default function AdminDashboard() {
 
   // Kiểm tra xem user có phải ADMIN không
   const isAdmin = userRoles.includes("ADMIN");
+  const isSales = userRoles.includes("SALES");
+  const isImportStaff = userRoles.includes("IMPORT_STAFF");
+  const isInventoryManager = userRoles.includes("INVENTORY_MANAGER");
+  const isAccountant = userRoles.includes("ACCOUNTANT");
 
   /**
    * Render content dựa trên role
@@ -70,6 +81,39 @@ export default function AdminDashboard() {
    */
   const renderContent = () => {
     // EMPLOYEE: chỉ xem Dashboard + Orders
+    if (!isAdmin && (isImportStaff || isInventoryManager || isAccountant)) {
+      switch (activeTab) {
+        case "inventory":
+          return (
+            <Suspense fallback={<div className="text-center py-10">Loading inventory...</div>}>
+              <InventoryReceiptsManagement />
+            </Suspense>
+          );
+        case "stock":
+          return (
+            <Suspense fallback={<div className="text-center py-10">Loading stock...</div>}>
+              <StockManagement />
+            </Suspense>
+          );
+        case "accounting":
+          return (
+            <Suspense fallback={<div className="text-center py-10">Loading accounting...</div>}>
+              <AccountingDashboard />
+            </Suspense>
+          );
+        case "orders":
+          return isSales ? (
+            <Suspense fallback={<div className="text-center py-10">Loading orders...</div>}>
+              <OrdersManagement />
+            </Suspense>
+          ) : (
+            <DashboardOverview />
+          );
+        default:
+          return <DashboardOverview />;
+      }
+    }
+
     if (!isAdmin) {
       switch (activeTab) {
         case "dashboard":
@@ -135,6 +179,34 @@ export default function AdminDashboard() {
           </Suspense>
         );
 
+      case "inventory":
+        return (
+          <Suspense fallback={<div className="text-center py-10">Loading inventory...</div>}>
+            <InventoryReceiptsManagement />
+          </Suspense>
+        );
+
+      case "stock":
+        return (
+          <Suspense fallback={<div className="text-center py-10">Loading stock...</div>}>
+            <StockManagement />
+          </Suspense>
+        );
+
+      case "accounting":
+        return (
+          <Suspense fallback={<div className="text-center py-10">Loading accounting...</div>}>
+            <AccountingDashboard />
+          </Suspense>
+        );
+
+      case "performance":
+        return (
+          <Suspense fallback={<div className="text-center py-10">Loading performance...</div>}>
+            <EmployeePerformanceView />
+          </Suspense>
+        );
+
       case "settings":
         return <SettingsView />;
 
@@ -168,6 +240,10 @@ export default function AdminDashboard() {
         setSidebarOpen={setSidebarOpen}
         onLogout={handleLogout}
         isAdmin={isAdmin}
+        isSales={isSales}
+        isImportStaff={isImportStaff}
+        isInventoryManager={isInventoryManager}
+        isAccountant={isAccountant}
       />
 
       {/* Main content */}
